@@ -1,0 +1,31 @@
+{
+  "name": "mastertang/phpcache",
+  "description": "pdo封装类",
+  "keywords": [
+    "redis",
+    "memcache",
+    "cache",
+    "pdo",
+    "PHP",
+    "php"
+  ],
+  "time": "2017-2-28",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "FileCache\\": "./"
+    }
+  },
+  "authors": [
+    {
+      "name": "RuiHua Tang",
+      "email": "547740900@qq.com",
+      "homepage": "https://github.com/",
+      "role": "Programmer"
+    }
+  ],
+  "require": {
+    "php": ">=5.3.0",
+    "predis/predis": "^1.1.1"
+  }
+}
