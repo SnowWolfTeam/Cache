@@ -39,112 +39,86 @@ class FileCache
 
     /**
      * 设置缓存
-     * @param $data
-     * @param $name
-     * @param int $cacheLife
-     * @return bool
-     * @throws FileException
      */
     public function setCache($data, $name, $cacheLife = NULL, $cachePath = '')
     {
-        try {
-            if (!is_dir($this->config['cachePath'])) {
-                $result = mkdir($this->config['cachePath'], 0775, true);
-                if (!$result)
-                    throw new FileException('设置缓存是创建文件路径失败', FileException::MKDIR_ERROR);
-            }
-            $cache = [];
-            $cache['contents'] = $data;
-            $cache['expire'] = $cacheLife !== NULL ? $_SERVER['REQUEST_TIME'] + $cacheLife
-                : $this->config['cacheLife'] === 0 ? 0
-                    : $_SERVER['REQUEST_TIME'] + $this->config['cacheLife'];
-            $filePath = $this->getCacheFilePath($cachePath, $name);
-            $this->filePutContents($filePath, $cache);
-            return true;
-        } catch (FileException $e) {
-            $this->exceptionCode = $e->getCode();
-            $this->exceptionMsg = $e->getMessage();
-            return false;
-        }
+        $filePath = $this->getCacheFilePath($cachePath, $name);
+        $cache = [];
+        $cache['contents'] = $data;
+        $cache['expire'] = ($cacheLife !== NULL) ? ($_SERVER['REQUEST_TIME'] + $cacheLife)
+            : (($this->config['cacheLife'] === 0) ? 0 : ($_SERVER['REQUEST_TIME'] + $this->config['cacheLife']));
+        $this->filePutContents($filePath, $cache);
+        return true;
     }
 
     /**
      * 设置缓存
-     * @param $data
-     * @param int $cacheLife
-     * @param string $cachePath
-     * @return bool
      */
-    public function setAllCache($data, $cacheLife = 0, $cachePath = '')
+    public function setAllCache($data, $cacheLife = NULL, $cachePath = '')
     {
-        try {
-            if (is_array($data)) {
-                if (!file_exists($this->config['cachePath'])) {
-                    $result = mkdir($this->config['cachePath'], 0775, true);
-                    if (!$result)
-                        throw new FileException('设置缓存是创建文件路径失败', FileException::MKDIR_ERROR);
-                }
-
-                $cache = [];
-                $filePath = '';
-                foreach ($data as $key => $values) {
-                    $cache['contents'] = $key;
-                    $cache['expire'] = $cacheLife !== 0 ? $_SERVER['REQUEST_TIME'] + $cacheLife
-                        : $this->config['cacheLife'] === 0 ? 0
-                            : $_SERVER['REQUEST_TIME'] + $this->config['cacheLife'];
-                    $cache['mtime'] = $_SERVER['REQUEST_TIME'];
-                    $filePath = $this->getCacheFilePath($cachePath, $values);
-                    $this->filePutContents($filePath, $cache);
-                    unset($cache);
-                }
-            } else
-                throw new FileException('当前函数的数据参数必须为数组内型', FileException::PARAMS_NOT_ARRAY);
-        } catch (FileException $e) {
-            $this->exceptionCode = $e->getCode();
-            $this->exceptionMsg = $e->getMessage();
-            return false;
-        }
+        if (is_array($data)) {
+            $cache = [];
+            $filePath = '';
+            $size = sizeof($data);
+            if (!is_array($cacheLife))
+                $cacheLife = $cacheLife == NULL ? [$this->config['cacheLife']] : [$cacheLife];
+            if (!is_array($cachePath))
+                $cachePath = $cachePath == "" ? [$this->config['cachePath']] : [$cachePath];
+            $dataKey = array_keys($data);
+            $dataValues = array_values($data);
+            for ($i = 0; $i < $size; $i++) {
+                $cache['contents'] = $dataValues[$i];
+                $cache['expire'] = isset($cacheLife[$i]) ?
+                    ($cacheLife[$i] == 0 ? 0 : ($_SERVER['REQUEST_TIME'] + $cacheLife[$i])) :
+                    ($this->config['cacheLife'] == 0 ? 0 : ($_SERVER['REQUEST_TIME'] + $this->config['cacheLife']));
+                echo isset($cacheLife[$i]) ? 1 : 0;
+                $filePath = $this->getCacheFilePath(
+                    isset($cachePath[$i]) ? $cachePath[$i] : $this->config['cachePath'],
+                    $dataKey[$i]);
+                $this->filePutContents($filePath, $cache);
+                unset($cache);
+            }
+            return true;
+        } else
+            throw new FileException('当前函数的数据参数必须为数组内型');
     }
 
     /**
      * 获取缓存
-     * @param $name
-     * @return mixed
-     * @throws FileException
      */
     public function getCache($name, $cachePath = '')
     {
-        try {
-            $filePath = $this->getCacheFilePath($cachePath, $name);
-            if (is_dir($filePath) || !file_exists($filePath))
-                throw new FileException('缓存文件不存在', FileException::CACHE_NAME_ERROR);
-            $data = $this->fileGetContents($filePath);
-            if ($data['expire'] == 0 || $_SERVER['REQUEST_TIME'] < $data['expire'])
-                return $data['contents'];
-            else {
-                unlink($filePath);
-                throw new FileException('缓存内容已过期', FileException::CACHE_TIME_OUT);
-            }
-        } catch (FileException $e) {
-            $this->exceptionCode = $e->getCode();
-            $this->exceptionMsg = $e->getMessage();
-            return false;
+        $filePath = $this->getCacheFilePath($cachePath, $name);
+        if (is_dir($filePath) || !file_exists($filePath))
+            throw new FileException('缓存文件不存在');
+        $data = $this->fileGetContents($filePath);
+        var_dump($data);
+        if ($data['expire'] == 0 || $_SERVER['REQUEST_TIME'] < $data['expire'])
+            return $data['contents'];
+        else {
+            unlink($filePath);
+            throw new FileException('缓存内容已过期');
         }
     }
 
     /**
      * 根据$nameArray获取多个缓存
-     * @param $nameArray
-     * @param $cachePath
-     * @return bool
      */
     public function getAllCache($nameArray, $cachePath = '')
     {
         $dataResult = [];
         $filePath = '';
         $data = '';
-        foreach ($nameArray as $value) {
-            $filePath = $this->getCacheFilePath($cachePath, $name);
+        $cachePath = empty($cachePath) ? $this->config['cachePath'] : $cachePath;
+        if (!is_array($cachePath))
+            $cachePath = [$cachePath];
+        $size = sizeof($nameArray);
+        for ($i = 0; $i < $size; $i++) {
+            $filePath = $this->getCacheFilePath(
+                isset($cachePath[$i]) ? $cachePath[$i] : $this->config['cachePath'],
+                $nameArray[$i]
+            );
+            echo $filePath;
             if (is_dir($filePath) || !file_exists($filePath)) {
                 $dataResult[] = NULL;
                 continue;
@@ -166,11 +140,11 @@ class FileCache
 
     /**
      * 检查缓存是否存在
-     * @param $name
-     * @return bool
      */
     public function checkCacheExist($name, $cachePath = '')
     {
+        if (!$this->checkCacheExpire($name, $cachePath))
+            return false;
         $filePath = $this->getCacheFilePath($cachePath, $name);
         if (is_dir($filePath) || !file_exists($filePath))
             return false;
@@ -180,72 +154,49 @@ class FileCache
 
     /**
      * 查看缓存是否过期
-     * @param $name
-     * @return bool
      */
     public function checkCacheExpire($name, $cachePath = '')
     {
-        try {
-            $filePath = $this->getCacheFilePath($cachePath, $name);
-            if (is_dir($filePath) || !file_exists($filePath))
-                return false;
-            $data = $this->fileGetContents($filePath);
-            if ($data['expire'] == 0 || $_SERVER['REQUEST_TIME'] < $data['expire'])
-                return true;
-            else {
-                unlink($filePath);
-                return false;
-            }
-        } catch (FileException $e) {
-            $this->exceptionCode = $e->getCode();
-            $this->exceptionMsg = $e->getMessage();
+        $filePath = $this->getCacheFilePath($cachePath, $name);
+        if (is_dir($filePath) || !file_exists($filePath))
             return false;
+        $data = $this->fileGetContents($filePath);
+        if ($data['expire'] == 0 || $_SERVER['REQUEST_TIME'] < $data['expire'])
+            return false;
+        else {
+            return true;
         }
     }
 
     /**
      * 删除cache
-     * @param $name
-     * @return bool
-     * @throws FileException
      */
     public function deleteCache($name, $cachePath = '')
     {
-        try {
-            $filePath = $this->getCacheFilePath($cachePath, $name);
-            if (is_dir($filePath) || !file_exists($filePath))
-                throw new FileException('缓存文件不存在', FileException::CACHE_NAME_ERROR);
+        $filePath = $this->getCacheFilePath($cachePath, $name);
+        if (is_dir($filePath) || !file_exists($filePath)) {
+            return true;
+        } else
             return unlink($filePath);
-        } catch (FileException $e) {
-            $this->exceptionCode = $e->getCode();
-            $this->exceptionMsg = $e->getMessage();
-            return false;
-        }
     }
 
     /**
      * 获取缓存内容
-     * @param $filePath
-     * @return mixed
-     * @throws FileException
      */
     private function fileGetContents($filePath)
     {
         $fileHandle = fopen($filePath, 'r');
         if ($fileHandle === false)
-            throw new FileException('文件打开失败', FileException::FILE_OPEN_FAILED);
+            throw new FileException('文件打开失败');
         $data = fread($fileHandle, filesize($filePath));
         if ($data === false)
-            throw new FileException('文件读取失败', FileException::FILE_READ_FAILED);
+            throw new FileException('文件读取失败');
         fclose($fileHandle);
         return unserialize($data);
     }
 
     /**
      * 存入内容到缓存
-     * @param $filePath
-     * @param $data
-     * @throws FileException
      */
     private function filePutContents($filePath, $data)
     {
@@ -257,22 +208,24 @@ class FileCache
             ftruncate($fileHandle, 0);
             $writeResult = fwrite($fileHandle, $serContents);
             if (!$writeResult)
-                throw new FileException('文件写入失败', FileException::FILE_WRITE_FAILED);
+                throw new FileException('文件写入失败');
             fclose($fileHandle);
         } else
-            throw new FileException('文件打开失败', FileException::FILE_OPEN_FAILED);
+            throw new FileException('文件打开失败');
         chmod($filePath, 0775);
     }
 
     /**
      * 生成加密缓存名字
-     * @param $cachePath
-     * @param $name
-     * @return string
      */
     private function getCacheFilePath($cachePath, $name)
     {
         $cachePath = empty($cachePath) ? $this->config['cachePath'] : $cachePath;
-        return $cachePath . md5($this->config['prefix'] . "_" . $name);
+        if (!is_dir($cachePath)) {
+            $result = mkdir($cachePath, 0775, true);
+            if (!$result)
+                throw new FileException('设置缓存是创建文件路径失败');
+        }
+        return $cachePath . DIRECTORY_SEPARATOR . md5($this->config['prefix'] . "_" . $name);
     }
 }

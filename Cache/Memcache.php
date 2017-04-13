@@ -8,13 +8,11 @@ class Memcache
 {
     /**
      * 检查扩展是否已经安装，返回Memcached实例
-     * @return Memcached
-     * @throws MemcacheException
      */
     public static function instance()
     {
         if (!extension_loaded('Memcached'))
-            throw new MemcacheException('Memcache扩展没有安装', MemcacheException::MEMCACHE_EXTENSION_NOT_INSTALL);
+            throw new MemcacheException('Memcache扩展没有安装');
         else
             return $memcache = new Memcached();
     }
